@@ -200,3 +200,6 @@ fabric.properties
 /build
 /captures
 .cxx
+
+# CUSTOMS
+notes.txt
