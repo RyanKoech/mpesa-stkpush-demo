@@ -3,9 +3,9 @@ package com.example.mpesaapp
 import android.app.ProgressDialog
 import android.os.Bundle
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.mpesaapp.Constants.BUSINESS_SHORT_CODE
-import com.example.mpesaapp.Constants.CALLBACKURL
 import com.example.mpesaapp.Constants.PARTYB
 import com.example.mpesaapp.Constants.PASSKEY
 import com.example.mpesaapp.Constants.TRANSACTION_TYPE
@@ -15,24 +15,31 @@ import com.example.mpesaapp.Utils.timestamp
 import com.example.mpesaapp.databinding.ActivityMainBinding
 import com.example.mpesaapp.model.AccessToken
 import com.example.mpesaapp.model.STKPush
+import com.example.mpesaapp.model.STKPushResponse
 import com.example.mpesaapp.services.DarajaApiClient
+import com.google.firebase.messaging.FirebaseMessaging
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import timber.log.Timber
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), MpesaListener {
 
 
     private lateinit var binding : ActivityMainBinding
     private lateinit var mApiClient: DarajaApiClient
     private lateinit var mProgressDialog: ProgressDialog
 
+    companion object {
+        lateinit var mpesaListener: MpesaListener
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        mpesaListener = this
         mProgressDialog = ProgressDialog(this)
         mApiClient = DarajaApiClient()
         mApiClient.setIsDebug(true) //Set True to enable logging, false to disable.
@@ -77,19 +84,21 @@ class MainActivity : AppCompatActivity() {
             sanitizePhoneNumber(phoneNumber!!),
             PARTYB,
             sanitizePhoneNumber(phoneNumber),
-            CALLBACKURL,
+            BuildConfig.FIREBASE_CALLBACK_URL,
             "SmartLoan Ltd",  //Account reference
             "SmartLoan STK PUSH by TDBSoft" //Transaction description
         )
         mApiClient.setGetAccessToken(false)
 
         //Sending the data to the Mpesa API, remember to remove the logging when in production.
-        mApiClient.mpesaService().sendPush(stkPush)!!.enqueue(object : Callback<STKPush?> {
-            override fun onResponse(call: Call<STKPush?>, response: Response<STKPush?>) {
+        mApiClient.mpesaService().sendPush(stkPush)!!.enqueue(object : Callback<STKPushResponse?> {
+            override fun onResponse(call: Call<STKPushResponse?>, response: Response<STKPushResponse?>) {
                 mProgressDialog.dismiss()
                 try {
                     if (response.isSuccessful) {
                         Timber.d("post submitted to API. %s", response.body())
+                        FirebaseMessaging.getInstance()
+                            .subscribeToTopic(response.body()!!.CheckoutRequestID)
                     } else {
                         Timber.e("Response %s", response.errorBody()?.string())
                     }
@@ -98,7 +107,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            override fun onFailure(call: Call<STKPush?>, t: Throwable) {
+            override fun onFailure(call: Call<STKPushResponse?>, t: Throwable) {
                 mProgressDialog.dismiss()
                 Timber.e(t)
             }
@@ -106,4 +115,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPointerCaptureChanged(hasCapture: Boolean) {}
+
+    override fun sendSuccesfull(amount: String, phone: String, date: String, receipt: String) {
+        runOnUiThread {
+            Toast.makeText(
+                this, "Payment Succesfull\n" +
+                        "Receipt: $receipt\n" +
+                        "Date: $date\n" +
+                        "Phone: $phone\n" +
+                        "Amount: $amount", Toast.LENGTH_LONG
+            ).show()
+
+        }
+    }
+
+    override fun sendFailed(reason: String) {
+        runOnUiThread {
+            Toast.makeText(
+                this, "Payment Failed\n" +
+                        "Reason: $reason"
+                , Toast.LENGTH_LONG
+            ).show()
+        }
+    }
 }
