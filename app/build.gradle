@@ -31,6 +31,7 @@ android {
     buildTypes.each {
         it.buildConfigField 'String', 'CONSUMER_KEY',DARAJA_CONSUMER_KEY
         it.buildConfigField 'String', 'CONSUMER_SECRET', DARAJA_CONSUMER_SECRET
+        it.buildConfigField 'String', 'FIREBASE_CALLBACK_URL', FIREBASE_CALLBACK_URL
     }
 
     compileOptions {
